@@ -1,4 +1,5 @@
 import bpy
+from mathutils import Vector
 
 
 class CBB_OT_bind(bpy.types.Operator):
@@ -8,7 +9,9 @@ class CBB_OT_bind(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        bind_bones(context)
+        if not bind_bones(context):
+            return {'CANCELLED'}
+
         return {'FINISHED'}
 
 
@@ -20,57 +23,75 @@ def popup_message_box(message="", title="", icon='INFO'):
     bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
 
-# Check if any curve point is selected
-def is_curve_point_selected():
-    for obj in bpy.context.selected_objects:
-        if obj.type == 'CURVE':
-            for spline in obj.data.splines:
-                for point in spline.points:
-                    if point.select_control_point:
-                        return True
-    return False
+# Store corrdinates of selected curve points
+def get_curve_points_coordinates(curve):
+    coordinates = []
+
+    for spline in curve.data.splines:
+        if spline.type == 'BEZIER':
+            for point in spline.bezier_points:
+                if point.select_control_point:
+                    coordinates.append(point.co)
+        elif spline.type == 'POLY' or spline.type == 'NURBS':
+            for point in spline.points:
+                if point.select:
+                    coordinates.append(point.co)
+
+    return coordinates
 
 
-# Add a bone to selected curve points
+# Add bones to the selected armature at the coordinates of the curve points
 def bind_bones(context):
-    # Error if no curve point is selected
-    if not is_curve_point_selected():
+    if not context.active_object:
+        popup_message_box("Select an armature object.", "Error", 'ERROR')
+        return False
+
+    if len(context.selected_objects) != 2:
+        popup_message_box("Select an armature and a curve object.", "Error", 'ERROR')
+        return False
+
+    # Get armature and curve objects
+    armature = None
+    curve = None
+
+    for obj in context.selected_objects:
+        if obj.type == 'ARMATURE':
+            armature = obj
+        elif obj.type == 'CURVE':
+            curve = obj
+
+    if not armature or not curve:
+        popup_message_box("Select an armature and a curve object.", "Error", 'ERROR')
+        return False
+
+    coodinates = get_curve_points_coordinates(curve)
+    if not coodinates:
         popup_message_box("No curve point selected", "Error", 'ERROR')
-        return
+        return False
 
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.armature.bone_primitive_add()
+    # Add bones to the armature
     bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.objects.active = armature
+    bpy.ops.object.mode_set(mode='EDIT')
+    for coordinate in coodinates:
+        # Because curve points are in local coordinates, we need to convert them to world space (matrix_world)
+        wm_offset = curve.matrix_world @ coordinate
+        bone = armature.data.edit_bones.new(name="HookBone")
+        bone.head = wm_offset
+        bone.tail = wm_offset + Vector((0, 0, 0.5))
 
-    # Set bone name to selected curve points
-    for obj in bpy.context.selected_objects:
-        if obj.type == 'CURVE':
-            for spline in obj.data.splines:
-                for point in spline.points:
-                    if point.select_control_point:
-                        obj.data.edit_bones[-1].name = point.name
-                        break
+    # TODO Add Hook modifier to curve object to the bones
 
-    # Set bone parent to selected curve points
-    for obj in bpy.context.selected_objects:
-        if obj.type == 'CURVE':
-            for spline in obj.data.splines:
-                for point in spline.points:
-                    if point.select_control_point:
-                        obj.data.edit_bones[-1].parent = obj.data.edit_bones[point.name]
-                        break
+    return True
 
 
-def register():
+def register_curve_bone_binder():
     bpy.utils.register_class(CBB_OT_bind)
 
 
-def unregister():
+def unregister_curve_bone_binder():
     bpy.utils.unregister_class(CBB_OT_bind)
 
 
 if __name__ == "__main__":
-    register()
-
-    # test call
-    # bind_bones(bpy.context)
+    register_curve_bone_binder()
