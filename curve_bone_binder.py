@@ -1,5 +1,6 @@
 import bpy
 from mathutils import Vector
+import dataclasses
 
 
 class CBB_OT_bind(bpy.types.Operator):
@@ -15,6 +16,13 @@ class CBB_OT_bind(bpy.types.Operator):
         return {'FINISHED'}
 
 
+@dataclasses.dataclass
+class CurveBoneTable:
+    point: bpy.types.SplinePoint
+    coordinate: Vector
+    bone_name: str = ""
+
+
 # Popup message box
 def popup_message_box(message="", title="", icon='INFO'):
     def draw(self, context):
@@ -24,20 +32,20 @@ def popup_message_box(message="", title="", icon='INFO'):
 
 
 # Store corrdinates of selected curve points
-def get_curve_points_coordinates(curve):
-    coordinates = []
+def get_curve_points_list(curve):
+    point_list = []
 
     for spline in curve.data.splines:
         if spline.type == 'BEZIER':
             for point in spline.bezier_points:
                 if point.select_control_point:
-                    coordinates.append(point.co)
+                    point_list.append(CurveBoneTable(point, point.co))
         elif spline.type == 'POLY' or spline.type == 'NURBS':
             for point in spline.points:
                 if point.select:
-                    coordinates.append(point.co)
+                    point_list.append(CurveBoneTable(point, point.co))
 
-    return coordinates
+    return point_list
 
 
 # Add bones to the selected armature at the coordinates of the curve points
@@ -64,8 +72,8 @@ def bind_bones(context):
         popup_message_box("Select an armature and a curve object.", "Error", 'ERROR')
         return False
 
-    coodinates = get_curve_points_coordinates(curve)
-    if not coodinates:
+    points_list = get_curve_points_list(curve)
+    if not points_list:
         popup_message_box("No curve point selected", "Error", 'ERROR')
         return False
 
@@ -73,15 +81,28 @@ def bind_bones(context):
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.context.view_layer.objects.active = armature
     bpy.ops.object.mode_set(mode='EDIT')
-    for coordinate in coodinates:
+    for item in points_list:
         # Because curve points are in local coordinates, we need to convert them to world space (matrix_world)
-        wm_offset = curve.matrix_world @ coordinate
+        wm_offset = curve.matrix_world @ item.coordinate
         bone = armature.data.edit_bones.new(name="HookBone")
         bone.head = wm_offset
         bone.tail = wm_offset + Vector((0, 0, 0.5))
+        item.bone_name = bone.name
 
-    # TODO Add Hook modifier to curve object to the bones
+    # Add Hook modifier and assign the curve points to the bones
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.objects.active = curve
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.curve.select_all(action='DESELECT')
+    for item in points_list:
+        item.point.select_control_point = True
+        mod = curve.modifiers.new(name="Hook", type='HOOK')
+        mod.object = armature
+        mod.subtarget = item.bone_name
+        bpy.ops.object.hook_assign(modifier=mod.name)
+        item.point.select_control_point = False
 
+    bpy.ops.object.mode_set(mode='OBJECT')
     return True
 
 
