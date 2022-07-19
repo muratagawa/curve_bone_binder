@@ -25,4 +25,5 @@ Usage
 2. Hold down `SHIFT` and select Curve object
 3. Press `TAB` to enter Edit mode
 4. Select the control point(s)
-5. Type `F3 > Bind`
+5. Press `Ctrl+H` -> Click "Hook to new bones"
+    - Or `F3 > Bind`
