@@ -53,7 +53,7 @@ def get_curve_points_list(curve):
     return point_list
 
 
-# Add bones to the selected armature at the coordinates of the curve points
+# Bind the selected control points to the new bones.
 def bind_bones(context):
     if (not context.active_object
             or len(context.selected_objects) != 2):
