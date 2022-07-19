@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Curve Bone Binder",
-    "author": "MURATAGAWA Kei",
-    "version": (0, 1, 0),
+    "author": "Kei Muratagawa",
+    "version": (0, 2, 0),
     "blender": (3, 0, 0),
     "location": "View3D Edit mode > Tool Shelf > New Object",
     "description": "Bind bones to selected curve points",

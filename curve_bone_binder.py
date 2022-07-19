@@ -23,6 +23,11 @@ class CurveBoneTable:
     bone_name: str = ""
 
 
+# Show in Hook (Ctrl+H) context menu
+def show_in_hook(self, context):
+    self.layout.operator(CBB_OT_bind.bl_idname, text="Hook to new bones")
+
+
 # Popup message box
 def popup_message_box(message="", title="", icon='INFO'):
     def draw(self, context):
@@ -48,14 +53,12 @@ def get_curve_points_list(curve):
     return point_list
 
 
-# Add bones to the selected armature at the coordinates of the curve points
+# Bind the selected control points to the new bones.
 def bind_bones(context):
-    if not context.active_object:
-        popup_message_box("Select an armature object.", "Error", 'ERROR')
-        return False
-
-    if len(context.selected_objects) != 2:
-        popup_message_box("Select an armature and a curve object.", "Error", 'ERROR')
+    if (not context.active_object
+            or len(context.selected_objects) != 2):
+        popup_message_box(
+            "Select an armature object and a curve object.", "Error", 'ERROR')
         return False
 
     # Get armature and curve objects
@@ -69,18 +72,20 @@ def bind_bones(context):
             curve = obj
 
     if not armature or not curve:
-        popup_message_box("Select an armature and a curve object.", "Error", 'ERROR')
+        popup_message_box(
+            "Select an armature object and a curve object.", "Error", 'ERROR')
         return False
 
     points_list = get_curve_points_list(curve)
     if not points_list:
-        popup_message_box("No curve point selected", "Error", 'ERROR')
+        popup_message_box("Select at least one curve point.", "Error", 'ERROR')
         return False
 
     # Add bones to the armature
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.context.view_layer.objects.active = armature
     bpy.ops.object.mode_set(mode='EDIT')
+
     for item in points_list:
         # Because curve points are in local coordinates, we need to convert them to world space (matrix_world)
         wm_offset = curve.matrix_world @ item.coordinate
@@ -94,6 +99,7 @@ def bind_bones(context):
     bpy.context.view_layer.objects.active = curve
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.curve.select_all(action='DESELECT')
+
     for item in points_list:
         item.point.select_control_point = True
         mod = curve.modifiers.new(name="Hook", type='HOOK')
@@ -108,10 +114,12 @@ def bind_bones(context):
 
 def register_curve_bone_binder():
     bpy.utils.register_class(CBB_OT_bind)
+    bpy.types.VIEW3D_MT_hook.append(show_in_hook)
 
 
 def unregister_curve_bone_binder():
     bpy.utils.unregister_class(CBB_OT_bind)
+    bpy.types.VIEW3D_MT_hook.remove(show_in_hook)
 
 
 if __name__ == "__main__":
