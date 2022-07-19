@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Curve Bone Binder",
-    "author": "MURATAGAWA Kei",
+    "author": "Kei Muratagawa",
     "version": (0, 2, 0),
     "blender": (3, 0, 0),
     "location": "View3D Edit mode > Tool Shelf > New Object",
