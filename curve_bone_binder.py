@@ -55,12 +55,10 @@ def get_curve_points_list(curve):
 
 # Add bones to the selected armature at the coordinates of the curve points
 def bind_bones(context):
-    if not context.active_object:
-        popup_message_box("Select an armature object.", "Error", 'ERROR')
-        return False
-
-    if len(context.selected_objects) != 2:
-        popup_message_box("Select an armature and a curve object.", "Error", 'ERROR')
+    if (not context.active_object
+            or len(context.selected_objects) != 2):
+        popup_message_box(
+            "Select an armature object and a curve object.", "Error", 'ERROR')
         return False
 
     # Get armature and curve objects
@@ -74,12 +72,13 @@ def bind_bones(context):
             curve = obj
 
     if not armature or not curve:
-        popup_message_box("Select an armature and a curve object.", "Error", 'ERROR')
+        popup_message_box(
+            "Select an armature object and a curve object.", "Error", 'ERROR')
         return False
 
     points_list = get_curve_points_list(curve)
     if not points_list:
-        popup_message_box("No curve point selected", "Error", 'ERROR')
+        popup_message_box("Select at least one curve point.", "Error", 'ERROR')
         return False
 
     # Add bones to the armature
