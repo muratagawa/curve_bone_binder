@@ -137,7 +137,7 @@ def bind_bones(self, context) -> bool:
         curve.data.splines[item.spline_index].bezier_points[item.point_index].select_right_handle = True
         curve.data.splines[item.spline_index].bezier_points[item.point_index].select_left_handle = True
         bpy.ops.object.hook_assign(modifier=mod.name)
-        self.report({'INFO'}, "Hooked " + bone_name + " via " + mod.name)
+        self.report({'INFO'}, "Bone=" + bone_name + ", Modifier=" + mod.name)
 
     bpy.ops.object.mode_set(mode='OBJECT')
     return True
