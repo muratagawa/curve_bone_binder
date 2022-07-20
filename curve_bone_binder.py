@@ -1,5 +1,5 @@
 import bpy
-from mathutils import Vector, Matrix
+from mathutils import Vector
 import dataclasses
 
 
@@ -18,7 +18,6 @@ class CBB_OT_bind(bpy.types.Operator):
 
 @dataclasses.dataclass
 class CurveBoneTable:
-    point: bpy.types.SplinePoint
     point_index: int
     spline_index: int
     type: str
@@ -47,12 +46,12 @@ def get_curve_points_list(curve):
             for p_idx, point in enumerate(spline.bezier_points):
                 if point.select_control_point:
                     point_list.append(CurveBoneTable(
-                        point, p_idx, s_idx, spline.type, point.co))
+                        p_idx, s_idx, spline.type, point.co))
         elif spline.type == 'POLY' or spline.type == 'NURBS':
             for p_idx, point in enumerate(spline.points):
                 if point.select:
                     point_list.append(CurveBoneTable(
-                        point, p_idx, s_idx, spline.type, point.co))
+                        p_idx, s_idx, spline.type, point.co))
 
     return point_list
 
