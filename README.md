@@ -1,8 +1,9 @@
-# Curve Bone Binder
+# Curve Bone Binder (Hook to new bones)
 
 Adds bones to the selected curve control points, and binds them with Hook modifier.
 
 ![Screencast](./screencast.gif)
+
 
 Requirements
 ----
