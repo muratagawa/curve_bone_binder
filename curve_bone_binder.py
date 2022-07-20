@@ -1,5 +1,5 @@
 import bpy
-from mathutils import Vector
+from mathutils import Vector, Matrix
 import dataclasses
 
 
@@ -103,16 +103,20 @@ def bind_bones(self, context) -> bool:
         return False
 
     for item in points_list:
-        # Add bones to the armature
+        # Translate local coordinate of the curve point to world coordinate
+        target_world_co = curve.matrix_world @ item.coordinate
+
+        # Translate world coordinate to Armature space local coordinate
+        target_armature_local_co = armature.matrix_world.inverted() @ target_world_co
+
+        # Add bone
         bpy.ops.object.mode_set(mode='OBJECT')
         bpy.context.view_layer.objects.active = armature
         bpy.ops.object.mode_set(mode='EDIT')
 
-        # Because curve points are in local coordinates, we need to convert them to world space (matrix_world)
-        wm_offset = curve.matrix_world @ item.coordinate
         bone = armature.data.edit_bones.new(name="HookBone")
-        bone.head = wm_offset
-        bone.tail = wm_offset + Vector((0, 0, 0.5))
+        bone.head = target_armature_local_co
+        bone.tail = target_armature_local_co + Vector((0, 0, 1))
         bone_name = bone.name
 
         # Select the added bone in pose mode
@@ -125,8 +129,8 @@ def bind_bones(self, context) -> bool:
         curve.select_set(True)
         bpy.context.view_layer.objects.active = curve
         bpy.ops.object.mode_set(mode='EDIT')
-
         deselect_all_curve_points(curve)
+
         mod = curve.modifiers.new(name="Hook", type='HOOK')
         mod.object = armature
         mod.subtarget = bone_name
@@ -136,7 +140,7 @@ def bind_bones(self, context) -> bool:
         bpy.ops.object.hook_assign(modifier=mod.name)
         self.report({'INFO'}, "Hooked " + bone_name + " via " + mod.name)
 
-    # bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode='OBJECT')
     return True
 
 
