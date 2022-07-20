@@ -10,7 +10,7 @@ class CBB_OT_bind(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        if not bind_bones(context):
+        if not bind_bones(self, context):
             return {'CANCELLED'}
 
         return {'FINISHED'}
@@ -19,8 +19,10 @@ class CBB_OT_bind(bpy.types.Operator):
 @dataclasses.dataclass
 class CurveBoneTable:
     point: bpy.types.SplinePoint
+    point_index: int
+    spline_index: int
+    type: str
     coordinate: Vector
-    bone_name: str = ""
 
 
 # Show in Hook (Ctrl+H) context menu
@@ -40,21 +42,40 @@ def popup_message_box(message="", title="", icon='INFO'):
 def get_curve_points_list(curve):
     point_list = []
 
-    for spline in curve.data.splines:
+    for s_idx, spline in enumerate(curve.data.splines):
         if spline.type == 'BEZIER':
-            for point in spline.bezier_points:
+            for p_idx, point in enumerate(spline.bezier_points):
                 if point.select_control_point:
-                    point_list.append(CurveBoneTable(point, point.co))
+                    point_list.append(CurveBoneTable(
+                        point, p_idx, s_idx, spline.type, point.co))
         elif spline.type == 'POLY' or spline.type == 'NURBS':
-            for point in spline.points:
+            for p_idx, point in enumerate(spline.points):
                 if point.select:
-                    point_list.append(CurveBoneTable(point, point.co))
+                    point_list.append(CurveBoneTable(
+                        point, p_idx, s_idx, spline.type, point.co))
 
     return point_list
 
 
+def deselect_all_curve_points(curve_object):
+    for spline in curve_object.data.splines:
+        if spline.type == 'BEZIER':
+            for point in spline.bezier_points:
+                point.select_control_point = False
+                point.select_right_handle = False
+                point.select_left_handle = False
+        elif spline.type == 'POLY' or spline.type == 'NURBS':
+            for point in spline.points:
+                point.select = False
+
+
+def deselect_all_bones(armature):
+    for bone in armature.data.bones:
+        bone.select = False
+
+
 # Bind the selected control points to the new bones.
-def bind_bones(context):
+def bind_bones(self, context) -> bool:
     if (not context.active_object
             or len(context.selected_objects) != 2):
         popup_message_box(
@@ -81,34 +102,41 @@ def bind_bones(context):
         popup_message_box("Select at least one curve point.", "Error", 'ERROR')
         return False
 
-    # Add bones to the armature
-    bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.context.view_layer.objects.active = armature
-    bpy.ops.object.mode_set(mode='EDIT')
-
     for item in points_list:
+        # Add bones to the armature
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.context.view_layer.objects.active = armature
+        bpy.ops.object.mode_set(mode='EDIT')
+
         # Because curve points are in local coordinates, we need to convert them to world space (matrix_world)
         wm_offset = curve.matrix_world @ item.coordinate
         bone = armature.data.edit_bones.new(name="HookBone")
         bone.head = wm_offset
         bone.tail = wm_offset + Vector((0, 0, 0.5))
-        item.bone_name = bone.name
+        bone_name = bone.name
 
-    # Add Hook modifier and assign the curve points to the bones
-    bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.context.view_layer.objects.active = curve
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.curve.select_all(action='DESELECT')
+        # Select the added bone in pose mode
+        bpy.ops.object.mode_set(mode='POSE')
+        deselect_all_bones(armature)
+        armature.data.bones[bone_name].select = True
 
-    for item in points_list:
-        item.point.select_control_point = True
+        # Add Hook modifier and assign the curve points to the bones
+        bpy.ops.object.mode_set(mode='OBJECT')
+        curve.select_set(True)
+        bpy.context.view_layer.objects.active = curve
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        deselect_all_curve_points(curve)
         mod = curve.modifiers.new(name="Hook", type='HOOK')
         mod.object = armature
-        mod.subtarget = item.bone_name
+        mod.subtarget = bone_name
+        curve.data.splines[item.spline_index].bezier_points[item.point_index].select_control_point = True
+        curve.data.splines[item.spline_index].bezier_points[item.point_index].select_right_handle = True
+        curve.data.splines[item.spline_index].bezier_points[item.point_index].select_left_handle = True
         bpy.ops.object.hook_assign(modifier=mod.name)
-        item.point.select_control_point = False
+        self.report({'INFO'}, "Hooked " + bone_name + " via " + mod.name)
 
-    bpy.ops.object.mode_set(mode='OBJECT')
+    # bpy.ops.object.mode_set(mode='OBJECT')
     return True
 
 
